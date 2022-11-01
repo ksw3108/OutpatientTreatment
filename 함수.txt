@@ -1,0 +1,308 @@
+create or replace FUNCTION f_han_h_pay(
+	v_ha_self_price IN receipts.HA_SELF_PRICE%type,
+	v_ha_pu_price   IN receipts.HA_PU_PRICE%type,
+	v_ha_selc_price IN receipts.HA_SELC_PRICE%type,
+	v_ha_etc_price  IN receipts.HA_ETC_PRICE%type
+)
+RETURN NUMBER
+IS
+        v_hang_h_sum       number(20);
+
+BEGIN
+
+	v_hang_h_sum := (v_ha_self_price+v_ha_pu_price+v_ha_selc_price+v_ha_etc_price);
+ 	return v_hang_h_sum;
+end;
+--------------------------------------------------------------
+create or replace FUNCTION f_han_price(
+	v_ch_self_price IN receipts.CH_SELF_PRICE%type,
+	v_ch_pu_price   IN receipts.CH_PU_PRICE%type,
+	v_ch_selc_price IN receipts.CH_SELC_PRICE%type,
+	v_ch_etc_price  IN receipts. CH_ETC_PRICE%type
+)
+RETURN NUMBER
+IS
+        v_hang_price_sum       number(20);
+
+BEGIN
+
+	v_hang_price_sum := (v_ch_self_price+v_ch_pu_price+v_ch_selc_price+v_ch_etc_price);
+ 	return v_hang_price_sum;
+end;
+--------------------------------------------------------------
+create or replace FUNCTION f_han_t_pay(
+	v_te_self_price IN receipts.TE_SELF_PRICE%type,
+	v_te_pu_price   IN receipts.TE_PU_PRICE%type,
+	v_te_selc_price IN receipts.TE_SELC_PRICE%type,
+	v_te_etc_price  IN receipts. TE_ETC_PRICE%type
+)
+RETURN NUMBER
+IS
+        v_hang_te_sum       number(20);
+
+BEGIN
+
+	v_hang_te_sum := (v_te_self_price+v_te_pu_price+v_te_selc_price+v_te_etc_price);
+ 	return v_hang_te_sum;
+end;
+--------------------------------------------------------------
+create or replace FUNCTION f_hany_pay(
+        v_total IN      receipts.TOTAL%TYPE,
+	v_ch_self_price IN receipts.CH_SELF_PRICE%type,
+	v_ch_pu_price   IN receipts.CH_PU_PRICE%type,
+	v_ch_selc_price IN receipts.CH_SELC_PRICE%type,
+	v_ch_etc_price  IN receipts.CH_ETC_PRICE%type
+)
+RETURN NUMBER
+IS
+        v_hang_sum       number(20);
+
+BEGIN
+
+	v_hang_sum := v_total-(v_ch_self_price+v_ch_pu_price+v_ch_selc_price+v_ch_etc_price);
+ 	return v_hang_sum;
+end;
+--------------------------------------------------------------
+create or replace function f_select
+	(i_patient_no number)
+	return number
+is
+	v_count number(10);
+begin
+
+select count(i_patient_no) into v_count from checkupcard natural join accepts group by i_patient_no;
+	return v_count;
+end;
+--------------------------------------------------------------
+create or replace function fun_c3
+	(i_doctor_no	number,
+	i_hant_code	number)
+	return number
+is
+	v_t_pay			number(10);
+	v_non_pay		number(10);
+	V_pay			number(10);
+	v_doctor_no		number(15);
+	v_select_rate		number(2,1);
+	v_hant_code		hanthird.hant_code%type;
+begin
+	select d.doctor_no, h.pay, h.non_pay, d.select_rate, h.hant_code
+	into v_doctor_no, v_pay, v_non_pay, v_select_rate, v_hant_code
+	from hanthird h, doctor d
+	where d.doctor_no = i_doctor_no and h.hant_code = i_hant_code;
+
+	v_t_pay := ((v_pay + v_non_pay * v_select_rate) - (v_pay + v_non_pay));
+
+	return v_t_pay;
+end;
+--------------------------------------------------------------
+create or replace function fun_check
+   	(i_doctor_no number)
+   	return number
+is
+   	v_num      number(10);
+   	v_treat_price    number(15);
+   	v_select_rate   number(2,1);
+   	v_doctor_no   number(15);
+begin
+   	select d.doctor_no, t.treat_price, d.select_rate into v_doctor_no, v_treat_price, v_select_rate
+   	from treat_prices t, doctor d
+   	where d.doctor_no = t.doctor_no and d.doctor_no=i_doctor_no;
+
+   	v_num := (v_treat_price * v_select_rate) - v_treat_price;
+
+ 	return v_num;
+end;
+--------------------------------------------------------------
+create or replace function fun_g3
+   	(i_doctor_no       number,
+	i_test_code	   number)
+   	return number
+is
+	v_t_pay			number(10);
+   	v_non_pay		number(10);
+   	v_pay	     		number(10);
+   	v_doctor_no  		number(15);
+	v_select_rate   	number(2,1);
+	v_test_code		test_info.test_code%type;
+begin
+   	select d.doctor_no, t.pay, t.non_pay, d.select_rate, t.test_code
+	into v_doctor_no, v_pay, v_non_pay, v_select_rate, v_test_code
+   	from test_info t, doctor d
+   	where d.doctor_no = i_doctor_no and t.test_code = i_test_code;
+
+	v_t_pay := ((v_pay + v_non_pay * v_select_rate) - (v_pay + v_non_pay)) * 10000;
+
+	return v_t_pay;
+end;
+--------------------------------------------------------------
+create or replace function fun_hantpublicpay
+   	(i_code   number,
+	i_health_insurance varchar2)
+   	return number
+is
+   	v_num      	number(10);
+   	v_non_pay	     	number(10);
+
+begin
+		select non_pay into v_non_pay from hanthird
+   		where hant_code=i_code;
+
+	if
+		i_health_insurance = 'Y' then
+
+   		v_num := (v_non_pay)*0.4 ;
+ 	else
+		v_num := 0; --보험이 없는사람
+	end if;
+	return v_num;
+end;
+--------------------------------------------------------------
+create or replace function fun_hantselfpay
+   	(i_code   number,
+	i_health_insurance varchar2)
+   	return number
+is
+   	v_num      	number(10);
+   	v_pay	     	number(10);
+
+begin
+		select pay into v_pay from hanthird
+   		where hant_code=i_code;
+
+	if
+		i_health_insurance = 'Y' then
+
+   		v_num := (v_pay)*0.6 ;
+ 	else
+		v_num := v_pay; --보험이 없는사람
+	end if;
+	return v_num;
+end;
+--------------------------------------------------------------
+create or replace function fun_hantselfpay
+   	(i_code   number,
+	i_health_insurance varchar2)
+   	return number
+is
+   	v_num      	number(10);
+   	v_pay	     	number(10);
+
+begin
+		select pay into v_pay from hanthird
+   		where hant_code=i_code;
+
+	if
+		i_health_insurance = 'Y' then
+
+   		v_num := (v_pay)*0.6 ;
+ 	else
+		v_num := v_pay; --보험이 없는사람
+	end if;
+	return v_num;
+end;
+--------------------------------------------------------------
+create or replace function fun_selectExpay
+   	(i_hant_code  number)
+   	return number
+is
+	v_deepnofk	number(10);
+	v_hantcode	number(15);
+   	v_pay	     	number(10);
+
+begin
+	--select DEEPTREAT_NO into v_deepnofk from receipts where RECEIPT_NO=i_receipt_no;
+	--select hant_code into v_hantcode from deeptreatloc where DEEPTREAT_NO= v_deepnofk;
+	select non_pay into v_pay from hanthird where hant_code=i_hant_code;
+	return v_pay;
+end;
+--------------------------------------------------------------
+create or replace function fun_testpublicpay
+(
+	i_code number,
+	i_health_insurance varchar2
+) return number
+is
+
+i_pay	number(10);
+v_pay	number(10);
+
+begin
+
+	select pay into v_pay from test_info where test_code=i_code;
+
+	if i_health_insurance='Y' then
+		i_pay:=v_pay * 0.4 * 10000;
+	else
+		i_pay:=0;
+	end if;
+
+	return i_pay;
+
+end;
+--------------------------------------------------------------
+create or replace function fun_testselfpay
+   	(i_code   number,
+	i_health_insurance varchar2)
+   	return number
+is
+   	v_num      	number(10);
+   	v_pay	     	number(10);
+
+   	begin
+
+	select pay into v_pay from test_info
+   	where i_code = test_code;
+
+	if
+		i_health_insurance = 'Y' then
+
+   		v_num := (v_pay)*0.6 *10000;
+ 	else
+		v_num := v_pay*10000 ;
+	end if;
+
+	return v_num;
+end;
+--------------------------------------------------------------
+create or replace function fun_tprice
+	(i_doctor_no number)
+	return number
+is
+	v_pay 		number(10);
+	v_doctor_no 	doctor.doctor_no%type;
+	v_treat_price	treat_prices.treat_price%type;
+begin
+	select	d.doctor_no, t.treat_price
+	into	v_doctor_no, v_treat_price
+	from	doctor d, treat_prices t
+	where	d.doctor_no = i_doctor_no and i_doctor_no = t.doctor_no;
+
+	v_pay := v_treat_price;
+
+	return v_pay;
+end;
+--------------------------------------------------------------
+create or replace function func_test_nonpay
+(
+	i_test_code test_info.test_code%type
+)return number
+
+is
+
+--	v_deeptreat_no receipts.deeptreat_no%type;
+	v_non_pay      test_info.non_pay%type;
+
+begin
+
+--	select  deeptreat_no into v_deeptreat_no from receipts where receipt_no=i_receipt_no;
+
+--	select 	t.non_pay *10000 into v_non_pay
+--	from 	deeptreatloc d, test_info t, receipts r
+--	where 	d.test_code=t.test_code and r.deeptreat_no=d.deeptreat_no and d.deeptreat_no=v_deeptreat_no;
+
+	select non_pay*10000 into v_non_pay from test_info where test_code=i_test_code;
+
+	return v_non_pay;
+
+end;

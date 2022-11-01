@@ -1,0 +1,184 @@
+create or replace procedure f_medical_exam_proc
+(
+	v_patient_name		 patients.patient_name%type,
+	v_patient_jumin		 patients.patient_jumin%type,
+	v_patient_sex	  	 patients.patient_sex%type,
+	v_patient_address	 patients.patient_address%type,
+	v_patient_call		 patients.patient_call%type,
+	v_patient_enrollday	 patients.patient_enrollday%type,
+	v_health_insurance	 patients.health_insurance%type
+)
+is
+begin
+	insert into patients(patient_no, patient_name, patient_jumin, patient_sex, patient_address, patient_call, patient_enrollday, health_insurance)
+		values(patients_seq_no.nextval, v_patient_name, v_patient_jumin, v_patient_sex,v_patient_address, v_patient_call, v_patient_enrollday, v_health_insurance);
+	commit;
+end;
+
+------------------------------------------------
+create or replace procedure p_05
+	(v_seq in number,
+	 t_dae in varchar2,
+	 t_jun in varchar2,
+	 t_so  in varchar2,
+	 h_dae in varchar2,
+	 h_jun in varchar2,
+	 h_so  in varchar2,
+	 d_dae in varchar2,
+	 d_jun in varchar2,
+	 d_so in varchar2,
+	 i_idx in varchar2,
+	 v_doc number)
+is
+	t_cnt number(15);
+	h_cnt number(15);
+	d_cnt number(15);
+
+begin
+	select test_code into t_cnt from test_info where (testroom_no=t_dae) and (detail_testname= t_so) and (testname=t_jun);
+	select hant_code into h_cnt from hanthird where (hant_name=  h_dae) and  (hant_kind_name=h_jun) and (prescription_name= h_so);
+	select druginfo_code into d_cnt from druginfo where (drug_form_kinds= d_dae) and  (drug_effect=d_jun) and (druginfo_name=d_so);
+	update deeptreatloc set test_code=t_cnt,hant_code=h_cnt,druginfo_code=d_cnt,doctor_no=v_doc,health_insurance=i_idx where deeptreat_no=v_seq;
+	commit;
+
+end;
+
+------------------------------------------------
+create or replace procedure p_receipt
+	(v_RECEIPT_NO in receipts.RECEIPT_NO%type,
+	 v_WII_PAY in receipts.WILL_PAY%type,
+	 v_UNPAID in receipts.UNPAID%type,
+	 v_WHETHERPAID in receipts.WHETHERPAID%type
+	)
+is
+	c_paid receipts.PAID%type;
+	p_pay  receipts.PATIENT_PAY%type;
+begin
+	if v_WHETHERPAID = '¿Ï³³' then
+		update receipts set WILL_PAY=0,unpaid=0,paid=(select patient_pay from receipts where receipt_no=v_RECEIPT_NO),WHETHERPAID='¿Ï³³',pay_date = sysdate
+		where RECEIPT_NO=v_RECEIPT_NO;--¿Ï³³ÀÌ¸é ³³ºÎÇÒ ±Ý¾× 0 ¾÷µ¥ÀÌÆ®
+	elsif v_WHETHERPAID = 'ºÐ³³' then
+		update receipts set unpaid=(v_UNPAID-v_WII_PAY),WILL_PAY=(v_UNPAID-v_WII_PAY), paid=v_WII_PAY,WHETHERPAID='ºÐ³³',pay_date = sysdate
+		where RECEIPT_NO=v_RECEIPT_NO;
+
+		select paid,patient_pay into c_paid,p_pay from receipts where receipt_no=v_RECEIPT_NO;
+		if c_paid=p_pay then
+			update receipts set WILL_PAY=0,unpaid=0,paid=(select patient_pay from receipts where receipt_no=v_RECEIPT_NO),WHETHERPAID='¿Ï³³',
+			pay_date = sysdate where RECEIPT_NO=v_RECEIPT_NO;
+		end if;
+	end if;
+	commit;
+
+end;
+
+------------------------------------------------
+create or replace procedure proc_accept
+(
+	v_receipt_no	 accepts.receipt_no%type,
+	v_doctor_no	 accepts.doctor_no%type,
+	v_emp_no	 accepts.emp_no%type
+
+)
+
+is
+
+begin
+
+	update accepts set doctor_no=v_doctor_no, emp_no=v_emp_no where receipt_no=v_receipt_no;
+		commit;
+end;
+------------------------------------------------
+create or replace procedure proc_check
+(
+	v_check_no	checkupCard.check_no%type,
+	v_sogun_no	checkupCard.sogun_no%type,
+	v_nurse_no	checkupCard.nurse_no%type,
+	v_treat_content checkupCard.treat_content%type
+)
+
+is
+
+begin
+	if v_sogun_no = 0 then
+	update checkupCard set nurse_no=v_nurse_no, treat_content=v_treat_content
+			       where check_no=v_check_no;
+	else
+	update checkupCard set sogun_no=v_sogun_no, nurse_no=v_nurse_no, treat_content=v_treat_content
+			       where check_no=v_check_no;
+	end if;
+end;
+
+------------------------------------------------
+create or replace procedure proc_opinion
+(
+	v_sogun_no		sogunsuloc.sogun_no%type,
+	v_sogun_doc_name 	sogunsuloc.sogun_doc_name%type,
+	v_sogun_doc_hosname 	sogunsuloc.sogun_doc_hosname%type,
+	v_sogun_doc_cal 	sogunsuloc.sogun_doc_cal%type,
+	v_sogun_doc_hospital	sogunsuloc.sogun_doc_hospital%type
+)
+is
+begin
+	update  sogunsuloc set sogun_doc_name =v_sogun_doc_name, sogun_doc_hosname=v_sogun_doc_hosname,
+		sogun_doc_cal=v_sogun_doc_cal, sogun_doc_hospital=v_sogun_doc_hospital where sogun_no=v_sogun_no;
+	commit;
+end;
+------------------------------------------------
+create or replace procedure proc_re_accept
+(
+	v_doctor_no	accepts.doctor_no%type,
+	v_patient_no 	accepts.patient_no%type,
+	v_receipt_day	accepts.receipt_day%type,
+	v_emp_no	accepts.emp_no%type,
+	v_first_medical	accepts.first_medical%type
+)
+is
+begin
+	insert into accepts(receipt_no, doctor_no, patient_no, receipt_day, emp_no, first_medical)
+	values(acc_seq_no.nextval, v_doctor_no, v_patient_no, v_receipt_day, v_emp_no, v_first_medical);
+	commit;
+end;
+------------------------------------------------
+create or replace procedure suga_pro
+	(sugacode suga_mst.code%type, nursing suga_mst.nursing_prescription%type,registrant suga_mst.first_registrant%type,
+h_edi suga_mst.h_insu_edi%type, m_edi suga_mst.h_insu_edi%type,i_edi suga_mst.h_insu_edi%type,
+	s_edi suga_mst.h_insu_edi%type, in_edi suga_mst.h_insu_edi%type,mo_edi suga_mst.h_insu_edi%type)
+
+	is
+	last_registration_date suga_mst.last_registration_date%type;
+	begin
+		update suga_mst set nursing_prescription =nursing, last_registrant =registrant,last_registration_date = sysdate, h_insu_edi=h_edi,
+				medi_aid_edi=m_edi,indust_edi=i_edi,self_insu_edi=s_edi,inter_edi=in_edi,mou_edi=mo_edi where code = sugacode;
+	commit;
+	end;
+
+------------------------------------------------
+create or replace procedure suga_pro1
+	(t_code test_info.test_code%type, t_loc test_info.testroom_loc%type,  t_no test_info.testroom_no%type, t_name test_info.testname%type,
+	t_detail test_info.detail_testname%type, t_deptno test_info.dept_no%type, t_pay test_info.pay%type, t_npay test_info.non_pay%type,testroom_mgr test_info.testroom_mgr%type,testroom_hp test_info.testroom_hp%type)
+	is
+	begin
+		insert into test_info values(t_no,t_loc, testroom_hp,testroom_mgr,t_name,t_detail,t_code,t_deptno,t_pay,t_npay,1);
+		commit;
+	end;
+------------------------------------------------
+create or replace procedure suga_pro2
+	(h_code hanthird.hant_code%type, h_pname hanthird.prescription_name%type, h_kind hanthird.hant_kind_name%type,
+	 h_name hanthird.hant_name%type, h_deptno hanthird.dept_no%type, h_pay hanthird.pay%type, h_npay hanthird.non_pay%type)
+	is
+	begin
+		insert into hanthird values(h_code,h_pname,h_kind,h_name,h_deptno,h_pay,h_npay,2);
+	commit;
+	end;
+------------------------------------------------
+create or replace procedure suga_pro3
+	(d_code druginfo.druginfo_code%type, d_name druginfo.druginfo_name%type, d_hamrag druginfo.druginfo_hamrag%type,
+	d_maker druginfo.druginfo_maker%type, d_count druginfo.druginfo_count%type, d_kind druginfo.drug_form_kinds%type,
+	d_effect druginfo.drug_effect%type, d_measure druginfo.drug_measure%type, d_pay druginfo.pay%type, d_npay druginfo.non_pay%type,
+	d_eat druginfo.drug_eat%type)
+	is
+	begin
+		insert into druginfo values(d_code, d_name, d_hamrag, d_maker, d_count, d_kind, d_effect, d_measure, d_pay, d_npay,3,d_eat);
+	commit;
+	end;
+
